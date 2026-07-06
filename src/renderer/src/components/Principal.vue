@@ -3,6 +3,12 @@ import { ref, computed, watchEffect, watch } from 'vue'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
+interface CustoItem {
+  custo: number
+  quantidade: number
+  diasParciais: number
+}
+
 interface FormData {
   os: string
   revisorOs: string
@@ -29,12 +35,12 @@ interface FormData {
   }
   item7: number
   custos: {
-    javaSenior: { custo: number; quantidade: number; diasParciais: number }
-    javaPleno: { custo: number; quantidade: number; diasParciais: number }
-    formsSenior: { custo: number; quantidade: number; diasParciais: number }
-    formsPleno: { custo: number; quantidade: number; diasParciais: number }
-    genexusSenior: { custo: number; quantidade: number; diasParciais: number }
-    genexusPleno: { custo: number; quantidade: number; diasParciais: number }
+    javaSenior: CustoItem
+    javaPleno: CustoItem
+    formsSenior: CustoItem
+    formsPleno: CustoItem
+    genexusSenior: CustoItem
+    genexusPleno: CustoItem
   }
 }
 
@@ -92,23 +98,30 @@ const formData = ref<FormData>({
 })
 
 const canUseStorage = typeof window !== 'undefined'
-const extractCostOnly = (costs) =>
-  Object.fromEntries(
-    Object.entries(costs).map(([key, value]) => [key, { custo: value?.custo ?? 0 }])
-  )
+const extractCostOnly = (
+  costs: Record<string, Partial<CustoItem>>
+): Record<string, { custo: number }> => {
+  const result: Record<string, { custo: number }> = {}
+  for (const key in costs) {
+    if (Object.prototype.hasOwnProperty.call(costs, key)) {
+      result[key] = { custo: costs[key]?.custo ?? 0 }
+    }
+  }
+  return result
+}
 
 if (canUseStorage) {
   const savedCosts = localStorage.getItem('custos')
   if (savedCosts) {
     try {
-      const parsedCosts = JSON.parse(savedCosts)
+      const parsedCosts = JSON.parse(savedCosts) as Record<string, Partial<CustoItem>>
       const costsOnly = extractCostOnly(parsedCosts)
-      formData.value.custos = Object.fromEntries(
-        Object.entries(formData.value.custos).map(([key, value]) => [
-          key,
-          { ...value, custo: costsOnly[key]?.custo ?? value.custo }
-        ])
-      )
+      let key: keyof FormData['custos']
+      for (key in formData.value.custos) {
+        if (costsOnly[key]) {
+          formData.value.custos[key].custo = costsOnly[key].custo
+        }
+      }
     } catch {
       // Ignorar dados corrompidos no storage
     }
@@ -125,64 +138,73 @@ watch(
   { deep: true }
 )
 
-const totalDiasT = computed(() => {
+const totalDiasT = computed((): number => {
   const { senior, pleno, diasUteis } = formData.value
 
   const resultDiasT =
-    senior.totalDiasOtp * diasUteis +
-    senior.parcial +
-    pleno.totalDiasOtp * diasUteis +
-    pleno.parcial
+    Number(senior.totalDiasOtp || 0) * Number(diasUteis || 0) +
+    Number(senior.parcial || 0) +
+    Number(pleno.totalDiasOtp || 0) * Number(diasUteis || 0) +
+    Number(pleno.parcial || 0)
 
   return isNaN(resultDiasT) ? 0 : resultDiasT
 })
 
-const totalDiasSenior = computed(() => {
+const totalDiasSenior = computed((): number => {
   const { senior, diasUteis } = formData.value
 
-  const resultDiasSenior = senior.totalDiasOtp * diasUteis + senior.parcial
+  const resultDiasSenior =
+    Number(senior.totalDiasOtp || 0) * Number(diasUteis || 0) + Number(senior.parcial || 0)
 
   return isNaN(resultDiasSenior) ? 0 : resultDiasSenior
 })
 
-const totalDiasPleno = computed(() => {
+const totalDiasPleno = computed((): number => {
   const { pleno, diasUteis } = formData.value
 
-  const resultDiasPleno = pleno.totalDiasOtp * diasUteis + pleno.parcial
+  const resultDiasPleno =
+    Number(pleno.totalDiasOtp || 0) * Number(diasUteis || 0) + Number(pleno.parcial || 0)
 
   return isNaN(resultDiasPleno) ? 0 : resultDiasPleno
 })
 
-const calculoItemQuatroUm = computed(() => {
+const calculoItemQuatroUm = computed((): number => {
   const { tpf, diasT } = formData.value
-  if (diasT === 0) return 0
-  const resultado = tpf / diasT
+  const numDiasT = Number(diasT || 0)
+  if (numDiasT === 0) return 0
+  const resultado = Number(tpf || 0) / numDiasT
   return parseFloat(resultado.toFixed(2))
 })
 
-const calculoItemQuatroDois = computed(() => {
-  if (calculoItemQuatroUm.value === 0) return 0
-  const resultado = calculoItemQuatroUm.value / 0.56
+const calculoItemQuatroDois = computed((): number => {
+  const val = Number(calculoItemQuatroUm.value || 0)
+  if (val === 0) return 0
+  const resultado = val / 0.56
   return parseFloat(resultado.toFixed(2))
 })
 
-const calculoItemQuatroQuarto = computed(() => {
+const calculoItemQuatroQuarto = computed((): number => {
   const { diasT, linhasCod } = formData.value
-  if (linhasCod.item43 === 0 || diasT === 0) return 0
-  const resultado = linhasCod.item43 / diasT
+  const numDiasT = Number(diasT || 0)
+  const numItem43 = Number(linhasCod.item43 || 0)
+  if (numItem43 === 0 || numDiasT === 0) return 0
+  const resultado = numItem43 / numDiasT
   return parseFloat(resultado.toFixed(2))
 })
 
-const calculoItemQuatroCinco = computed(() => {
-  if (calculoItemQuatroQuarto.value === 0) return 0
-  const resultado = calculoItemQuatroQuarto.value / 33.33
+const calculoItemQuatroCinco = computed((): number => {
+  const val = Number(calculoItemQuatroQuarto.value || 0)
+  if (val === 0) return 0
+  const resultado = val / 33.33
   return parseFloat(resultado.toFixed(2))
 })
 
-const calculoItemSete = computed(() => {
+const calculoItemSete = computed((): number => {
   const { linhasCod } = formData.value
-  if (linhasCod.item42 === 0 || linhasCod.item45 === 0) return 0
-  const resultado = 0.25 * linhasCod.item42 + 0.2 * linhasCod.item45 + 0.4 * 1 + 0.15 * 1
+  const numItem42 = Number(linhasCod.item42 || 0)
+  const numItem45 = Number(linhasCod.item45 || 0)
+  if (numItem42 === 0 || numItem45 === 0) return 0
+  const resultado = 0.25 * numItem42 + 0.2 * numItem45 + 0.4 * 1 + 0.15 * 1
   return parseFloat(resultado.toFixed(2))
 })
 
@@ -198,30 +220,32 @@ watchEffect(() => {
   formData.value.item7 = calculoItemSete.value
 })
 
-const totalSenior = computed(() => {
+const totalSenior = computed((): number => {
   const { javaSenior, formsSenior, genexusSenior } = formData.value.custos
+  const diasUteisVal = Number(formData.value.diasUteis || 1) || 1
 
   const resultJavaSenior =
-    javaSenior.custo * javaSenior.quantidade +
-    formsSenior.custo * formsSenior.quantidade +
-    genexusSenior.custo * genexusSenior.quantidade +
-    (javaSenior.custo / formData.value.diasUteis) * javaSenior.diasParciais +
-    (formsSenior.custo / formData.value.diasUteis) * formsSenior.diasParciais +
-    (genexusSenior.custo / formData.value.diasUteis) * genexusSenior.diasParciais
+    Number(javaSenior.custo || 0) * Number(javaSenior.quantidade || 0) +
+    Number(formsSenior.custo || 0) * Number(formsSenior.quantidade || 0) +
+    Number(genexusSenior.custo || 0) * Number(genexusSenior.quantidade || 0) +
+    (Number(javaSenior.custo || 0) / diasUteisVal) * Number(javaSenior.diasParciais || 0) +
+    (Number(formsSenior.custo || 0) / diasUteisVal) * Number(formsSenior.diasParciais || 0) +
+    (Number(genexusSenior.custo || 0) / diasUteisVal) * Number(genexusSenior.diasParciais || 0)
 
   return isNaN(resultJavaSenior) ? 0 : resultJavaSenior
 })
 
-const totalPleno = computed(() => {
+const totalPleno = computed((): number => {
   const { javaPleno, formsPleno, genexusPleno } = formData.value.custos
+  const diasUteisVal = Number(formData.value.diasUteis || 1) || 1
 
   const resultJavaPleno =
-    javaPleno.custo * javaPleno.quantidade +
-    formsPleno.custo * formsPleno.quantidade +
-    genexusPleno.custo * genexusPleno.quantidade +
-    (javaPleno.custo / formData.value.diasUteis) * javaPleno.diasParciais +
-    (formsPleno.custo / formData.value.diasUteis) * formsPleno.diasParciais +
-    (genexusPleno.custo / formData.value.diasUteis) * genexusPleno.diasParciais
+    Number(javaPleno.custo || 0) * Number(javaPleno.quantidade || 0) +
+    Number(formsPleno.custo || 0) * Number(formsPleno.quantidade || 0) +
+    Number(genexusPleno.custo || 0) * Number(genexusPleno.quantidade || 0) +
+    (Number(javaPleno.custo || 0) / diasUteisVal) * Number(javaPleno.diasParciais || 0) +
+    (Number(formsPleno.custo || 0) / diasUteisVal) * Number(formsPleno.diasParciais || 0) +
+    (Number(genexusPleno.custo || 0) / diasUteisVal) * Number(genexusPleno.diasParciais || 0)
 
   return isNaN(resultJavaPleno) ? 0 : resultJavaPleno
 })
@@ -245,16 +269,16 @@ const customAlert = ref({
   message: ''
 })
 
-function showAlert(message: string) {
+function showAlert(message: string): void {
   customAlert.value.visible = true
   customAlert.value.message = message
 }
 
-function closeAlert() {
+function closeAlert(): void {
   customAlert.value.visible = false
 }
 
-function validateInput(event: KeyboardEvent) {
+function validateInput(event: KeyboardEvent): void {
   const input = event.target as HTMLInputElement
   if (event.key === '-' || event.code === 'Minus' || Number(input.value) < 0) {
     input.value = '0'
@@ -262,7 +286,7 @@ function validateInput(event: KeyboardEvent) {
   }
 }
 
-function clearInputs() {
+function clearInputs(): void {
   formData.value.os = ''
   formData.value.tpf = 0
   formData.value.diasSenior = 0
@@ -286,7 +310,7 @@ function clearInputs() {
   invalidFields.value.linhasCod = false
 }
 
-function validateRequiredForExport() {
+function validateRequiredForExport(): boolean {
   const trimmedOs = formData.value.os.trim()
   const trimmedRevisor = formData.value.revisorOs.trim().length > 5
 
@@ -300,7 +324,7 @@ function validateRequiredForExport() {
 }
 
 // FUNÇÃO EXPORT TO PDF - AGORA DENTRO DO SCRIPT SETUP
-async function exportToPDF() {
+async function exportToPDF(): Promise<void> {
   try {
     if (!validateRequiredForExport()) {
       if (invalidFields.value.os) {
@@ -332,7 +356,7 @@ async function exportToPDF() {
       const element = document.querySelector('.form-container') as HTMLElement
       if (!element) return
 
-      const mmToPx = (mm: number) => (mm * 96) / 25.4
+      const mmToPx = (mm: number): number => (mm * 96) / 25.4
       const pageWidthPx = mmToPx(210)
       const pageHeightPx = mmToPx(297)
       const marginPx = mmToPx(10)
@@ -385,7 +409,7 @@ async function exportToPDF() {
     const marginMm = 10
     const availableWidthMm = pdfWidth - marginMm * 2
     const availableHeightMm = pdfHeight - marginMm * 2
-    const pxToMm = (px: number) => (px * 25.4) / 96
+    const pxToMm = (px: number): number => (px * 25.4) / 96
     const imgWidthMm = pxToMm(canvas.width)
     const imgHeightMm = pxToMm(canvas.height)
     const ratio = Math.min(availableWidthMm / imgWidthMm, availableHeightMm / imgHeightMm)
@@ -417,8 +441,8 @@ async function exportToPDF() {
       <div class="form-row" style="margin-top: 5px">
         <label class="label-os">OS:</label>
         <input
-          type="text"
           v-model="formData.os"
+          type="text"
           :class="['yellow-input', { 'invalid-input': invalidFields.os }]"
           style="color: black"
           @input="invalidFields.os = false"
@@ -428,16 +452,16 @@ async function exportToPDF() {
       <div class="form-row">
         <label class="label-os">Revisor OS:</label>
         <input
-          type="text"
           v-model="formData.revisorOs"
+          type="text"
           :class="['yellow-input', { 'invalid-input': invalidFields.revisorOs }]"
           style="color: black"
           @input="invalidFields.revisorOs = false"
         />
       </div>
       <div class="button-group">
-        <button @click="exportToPDF" class="export-button">Exportar PDF</button>
-        <button @click="clearInputs" class="clear-button">Limpar Dados</button>
+        <button class="export-button" @click="exportToPDF">Exportar PDF</button>
+        <button class="clear-button" @click="clearInputs">Limpar Dados</button>
       </div>
     </div>
 
@@ -448,8 +472,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>TPF:</label>
             <input
-              type="number"
               v-model="formData.tpf"
+              type="number"
               :class="['yellow-input', { 'invalid-input': invalidFields.tpf }]"
               style="color: black"
               min="0"
@@ -460,8 +484,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>DIAS T:</label>
             <input
-              type="number"
               v-model="formData.diasT"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -470,8 +494,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>DIAS ÚTEIS:</label>
             <input
-              type="number"
               v-model="formData.diasUteis"
+              type="number"
               :class="['yellow-input', { 'invalid-input': invalidFields.diasUteis }]"
               style="color: black"
               min="0"
@@ -482,8 +506,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>DIAS Senior:</label>
             <input
-              type="number"
               v-model="formData.diasSenior"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -492,8 +516,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>DIAS Pleno:</label>
             <input
-              type="number"
               v-model="formData.diasPleno"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -506,8 +530,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>Funcionários FULL:</label>
             <input
-              type="number"
               v-model="formData.senior.totalDiasOtp"
+              type="number"
               class="yellow-input"
               style="color: black"
               min="0"
@@ -517,8 +541,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>Dias Parciais:</label>
             <input
-              type="number"
               v-model="formData.senior.parcial"
+              type="number"
               class="yellow-input"
               style="color: black"
               min="0"
@@ -532,8 +556,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>Funcionários FULL:</label>
             <input
-              type="number"
               v-model="formData.pleno.totalDiasOtp"
+              type="number"
               class="yellow-input"
               style="color: black"
               min="0"
@@ -543,8 +567,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>Dias Parciais:</label>
             <input
-              type="number"
               v-model="formData.pleno.parcial"
+              type="number"
               class="yellow-input"
               style="color: black"
               min="0"
@@ -561,8 +585,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>LINHAS DE CÓD:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item4"
+              type="number"
               :class="['yellow-input', { 'invalid-input': invalidFields.linhasCod }]"
               style="color: black"
               min="0"
@@ -573,8 +597,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>4.1:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item41"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -583,8 +607,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>4.2:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item42"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -593,8 +617,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>4.3:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item43"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -603,8 +627,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>4.4:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item44"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -613,8 +637,8 @@ async function exportToPDF() {
           <div class="form-row">
             <label>4.5:</label>
             <input
-              type="number"
               v-model="formData.linhasCod.item45"
+              type="number"
               class="black-input"
               style="color: white"
               readonly
@@ -653,8 +677,8 @@ async function exportToPDF() {
                 <td style="text-transform: capitalize">{{ key.replace(/([A-Z])/g, ' $1') }}</td>
                 <td>
                   <input
-                    type="number"
                     v-model="item.custo"
+                    type="number"
                     class="yellow-input"
                     style="color: black"
                     min="0"
@@ -664,8 +688,8 @@ async function exportToPDF() {
                 </td>
                 <td>
                   <input
-                    type="number"
                     v-model="item.quantidade"
+                    type="number"
                     class="yellow-input"
                     style="color: black"
                     min="0"
@@ -674,8 +698,8 @@ async function exportToPDF() {
                 </td>
                 <td>
                   <input
-                    type="number"
                     v-model="item.diasParciais"
+                    type="number"
                     class="yellow-input"
                     style="color: black"
                     min="0"
