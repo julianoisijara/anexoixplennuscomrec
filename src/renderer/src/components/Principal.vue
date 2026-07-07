@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect, watch } from 'vue'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 
 interface CustoItem {
   custo: number
@@ -45,22 +43,8 @@ interface FormData {
 }
 
 const osPrefix = 'COMREC_OS'
-let ipcRenderer: {
-  invoke: (channel: string, payload?: Record<string, unknown>) => Promise<{ canceled?: boolean }>
-} | null = null
-if (
-  typeof window !== 'undefined' &&
-  (window as unknown as { require?: (module: string) => unknown }).require
-) {
-  try {
-    const electron = (
-      window as unknown as { require: (module: string) => { ipcRenderer?: typeof ipcRenderer } }
-    ).require('electron')
-    ipcRenderer = electron.ipcRenderer ?? null
-  } catch {
-    ipcRenderer = null
-  }
-}
+const ipcRenderer =
+  typeof window !== 'undefined' && window.electron ? window.electron.ipcRenderer : null
 
 const formData = ref<FormData>({
   os: '',
@@ -88,12 +72,12 @@ const formData = ref<FormData>({
   },
   item7: 0,
   custos: {
-    javaSenior: { custo: 25366.86, quantidade: 0, diasParciais: 0 },
-    javaPleno: { custo: 17927.47, quantidade: 0, diasParciais: 0 },
-    formsSenior: { custo: 25212.77, quantidade: 0, diasParciais: 0 },
-    formsPleno: { custo: 17681.4, quantidade: 0, diasParciais: 0 },
-    genexusSenior: { custo: 25924.98, quantidade: 0, diasParciais: 0 },
-    genexusPleno: { custo: 17334.43, quantidade: 0, diasParciais: 0 }
+    javaSenior: { custo: 26627.4, quantidade: 0, diasParciais: 0 },
+    javaPleno: { custo: 18808.6, quantidade: 0, diasParciais: 0 },
+    formsSenior: { custo: 26465.46, quantidade: 0, diasParciais: 0 },
+    formsPleno: { custo: 18549.98, quantidade: 0, diasParciais: 0 },
+    genexusSenior: { custo: 27213.99, quantidade: 0, diasParciais: 0 },
+    genexusPleno: { custo: 18185.32, quantidade: 0, diasParciais: 0 }
   }
 })
 
@@ -349,87 +333,33 @@ async function exportToPDF(): Promise<void> {
       }
       return
     }
+
     const trimmedName = formData.value.os.trim()
     const finalFileName = trimmedName ? `${osPrefix}_${trimmedName}.pdf` : `${osPrefix}.pdf`
 
-    if (ipcRenderer) {
-      const element = document.querySelector('.form-container') as HTMLElement
-      if (!element) return
+    const originalTitle = document.title
+    const titleName = finalFileName.replace(/\.pdf$/i, '')
+    document.title = titleName
 
-      const mmToPx = (mm: number): number => (mm * 96) / 25.4
-      const pageWidthPx = mmToPx(210)
-      const pageHeightPx = mmToPx(297)
-      const marginPx = mmToPx(10)
-      const availableWidth = pageWidthPx - marginPx * 2
-      const availableHeight = pageHeightPx - marginPx * 2
-      const contentWidthPx = Math.max(element.scrollWidth, element.offsetWidth)
-      const contentHeightPx = Math.max(element.scrollHeight, element.offsetHeight)
-      const scale = Math.min(availableWidth / contentWidthPx, availableHeight / contentHeightPx, 1)
-      const originalStyle = element.style.cssText
-
-      element.style.transformOrigin = 'top left'
-      element.style.transform = `scale(${scale})`
-      element.style.width = `${contentWidthPx}px`
-      element.style.backgroundColor = 'white'
-      element.style.padding = '0'
-
-      try {
-        const result = await ipcRenderer.invoke('export-pdf', { defaultFileName: finalFileName })
-        if (result?.canceled) return
-      } finally {
-        element.style.cssText = originalStyle
+    try {
+      if (ipcRenderer) {
+        await ipcRenderer.invoke('export-pdf', {
+          defaultFileName: finalFileName
+        })
+        return
       }
-      return
+
+      // Fallback para navegador
+      window.print()
+    } catch (error) {
+      console.error('Erro ao exportar PDF via IPC/Impressora:', error)
+      showAlert('Erro ao exportar PDF. Tente novamente.')
+    } finally {
+      document.title = originalTitle
     }
-
-    const element = document.querySelector('.form-container') as HTMLElement
-    if (!element) return
-
-    // Configurar o elemento para captura
-    const originalStyle = element.style.cssText
-    element.style.width = '1200px'
-    element.style.backgroundColor = 'white'
-    element.style.padding = '20px'
-
-    const canvas = await html2canvas(element, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: 'white',
-      width: 1200,
-      height: element.scrollHeight
-    })
-
-    // Restaurar estilo original
-    element.style.cssText = originalStyle
-
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const pdfHeight = pdf.internal.pageSize.getHeight()
-    const marginMm = 10
-    const availableWidthMm = pdfWidth - marginMm * 2
-    const availableHeightMm = pdfHeight - marginMm * 2
-    const pxToMm = (px: number): number => (px * 25.4) / 96
-    const imgWidthMm = pxToMm(canvas.width)
-    const imgHeightMm = pxToMm(canvas.height)
-    const ratio = Math.min(availableWidthMm / imgWidthMm, availableHeightMm / imgHeightMm)
-    const renderWidthMm = imgWidthMm * ratio
-    const renderHeightMm = imgHeightMm * ratio
-    const imgX = (pdfWidth - renderWidthMm) / 2
-    const imgY = marginMm
-
-    pdf.addImage(imgData, 'PNG', imgX, imgY, renderWidthMm, renderHeightMm)
-
-    // Gerar nome do arquivo com data/hora atual
-    // const now = new Date();
-    // const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
-    // const fileName = `calculadora-plennus-${timestamp}.pdf`;
-
-    // Usar o nome fornecido pelo usuário
-    pdf.save(finalFileName)
   } catch (error) {
-    console.error('Erro ao exportar PDF:', error)
-    showAlert('Erro ao exportar PDF. Tente novamente.')
+    console.error('Erro no fluxo de exportação:', error)
+    showAlert('Erro inesperado ao exportar PDF.')
   }
 }
 </script>
@@ -879,9 +809,49 @@ input[type='number'] {
 
 @media print {
   :global(body) {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
+  .button-group,
+  .export-button,
+  .clear-button {
+    display: none !important;
+  }
+  .form-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: scale(0.83) !important;
+    transform-origin: top left !important;
+  }
+  .form-section {
+    padding: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  .form-row {
+    margin-bottom: 5px !important;
+  }
+  h2,
+  h3 {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+  }
+  table {
+    margin-top: 5px !important;
+  }
+  th,
+  td {
+    padding: 4px 6px !important;
+  }
+}
+@page {
+  size: A4 landscape;
+  margin: 8mm;
 }
 
 h2,

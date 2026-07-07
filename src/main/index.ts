@@ -1,5 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { join, dirname } from 'path'
+import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -51,6 +52,95 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle('export-pdf', async (event, { defaultFileName }: { defaultFileName: string }) => {
+    const webContents = event.sender
+    const window = BrowserWindow.fromWebContents(webContents)
+    if (!window) {
+      return { canceled: true }
+    }
+
+    const configPath = join(app.getPath('userData'), 'settings.json')
+
+    // Helper function to get the last save directory
+    const getLastSaveDir = (): string => {
+      try {
+        if (fs.existsSync(configPath)) {
+          const settings = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+          if (settings && typeof settings.lastSaveDir === 'string') {
+            let dir = settings.lastSaveDir
+            while (dir) {
+              try {
+                if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+                  console.log('getLastSaveDir: Usando pasta recuperada:', dir)
+                  return dir
+                }
+              } catch {
+                // Ignora erros de stat para caminhos inexistentes
+              }
+              const parent = dirname(dir)
+              if (parent === dir) break
+              dir = parent
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error reading settings:', error)
+      }
+      const defaultDir = app.getPath('documents')
+      console.log('getLastSaveDir: Usando pasta padrão (Documents):', defaultDir)
+      return defaultDir
+    }
+
+    // Helper function to save the last save directory
+    const saveLastSaveDir = (dir: string): void => {
+      try {
+        const parentDir = dirname(configPath)
+        if (!fs.existsSync(parentDir)) {
+          fs.mkdirSync(parentDir, { recursive: true })
+        }
+        fs.writeFileSync(configPath, JSON.stringify({ lastSaveDir: dir }), 'utf-8')
+        console.log('saveLastSaveDir: Configuração de pasta salva com sucesso:', dir)
+      } catch (error) {
+        console.error('Error saving settings:', error)
+      }
+    }
+
+    const lastDir = getLastSaveDir()
+    const defaultPath = join(lastDir, defaultFileName)
+    console.log('export-pdf: defaultPath resolvido:', defaultPath)
+
+    const { canceled, filePath } = await dialog.showSaveDialog(window, {
+      title: 'Exportar PDF',
+      defaultPath,
+      filters: [{ name: 'Adobe PDF Document', extensions: ['pdf'] }]
+    })
+
+    if (canceled || !filePath) {
+      console.log('export-pdf: Operação cancelada pelo usuário.')
+      return { canceled: true }
+    }
+
+    const newDir = dirname(filePath)
+    saveLastSaveDir(newDir)
+
+    try {
+      const data = await webContents.printToPDF({
+        margins: {
+          marginType: 'none'
+        },
+        pageSize: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true
+      })
+      fs.writeFileSync(filePath, data)
+      console.log('export-pdf: PDF gravado com sucesso em:', filePath)
+      return { canceled: false, filePath }
+    } catch (error) {
+      console.error('Failed to write PDF:', error)
+      throw error
+    }
+  })
 
   createWindow()
 
