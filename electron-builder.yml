@@ -15,11 +15,10 @@ asarUnpack:
 win:
   executableName: anexoixplennuscomrec
   icon: public/fab.ico
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  target:
+    - portable
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
 mac:
   icon: public/fab.icns
   target:
@@ -37,10 +36,13 @@ linux:
   icon: public/fab.png
   target:
     - AppImage
+    - deb
     - tar.gz
   maintainer: electronjs.org
   category: Utility
 appImage:
+  artifactName: ${name}-${version}.${ext}
+deb:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:

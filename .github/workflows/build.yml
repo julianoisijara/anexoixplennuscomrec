@@ -1,0 +1,60 @@
+name: CI Build
+
+on:
+  # Dispara ao criar uma tag de versão (ex.: v1.1.0)
+  push:
+    tags:
+      - 'v*'
+  # Permite disparar manualmente pela aba Actions do GitHub
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            script: build:win
+          - os: ubuntu-latest
+            platform: linux
+            script: build:linux
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Gera os pacotes portáteis. --publish never evita qualquer publicação automática.
+      - name: Build (${{ matrix.platform }})
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      - name: Publicar artefatos - Windows (portátil)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Publicar artefatos - Linux (AppImage, deb, tar.gz)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.tar.gz
+          if-no-files-found: error
