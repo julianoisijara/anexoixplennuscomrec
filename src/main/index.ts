@@ -5,6 +5,11 @@ import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../public/fab.png?asset'
 
+// Nome exibido do programa (dock/barra de menu no macOS, título da janela, etc.)
+const APP_NAME = 'Anexo IX Plennus (ComRec)'
+// Precisa ser definido antes do app ficar pronto para substituir o nome padrão "Electron"
+app.setName(APP_NAME)
+
 function createMenu(): void {
   const template: MenuItemConstructorOptions[] = [
     // No macOS os menus padrão (app/editar) são necessários para atalhos como copiar/colar
@@ -33,6 +38,7 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: true,
+    title: APP_NAME,
     autoHideMenuBar: false,
     // Ícone da janela no Linux e Windows (no macOS o ícone vem do bundle .icns)
     ...(process.platform !== 'darwin' ? { icon } : {}),

@@ -1,5 +1,5 @@
 appId: com.electron.app
-productName: anexoixplennuscomrec
+productName: Anexo IX Plennus (ComRec)
 directories:
   buildResources: build
 files:
