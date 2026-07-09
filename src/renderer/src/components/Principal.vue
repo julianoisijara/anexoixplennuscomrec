@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watchEffect, watch } from 'vue'
+import { ref, computed, watchEffect, watch, onUnmounted } from 'vue'
 
 interface CustoItem {
   custo: number
@@ -262,6 +262,31 @@ function closeAlert(): void {
   customAlert.value.visible = false
 }
 
+// Informações "Sobre o programa" (mantenha a versão sincronizada com o package.json)
+const showAbout = ref(false)
+const appInfo = {
+  nome: 'Anexo IX Plennus (ComRec)',
+  autor: '1T Juliano CCARJ',
+  email: 'julianojri@fab.mil.br',
+  versao: '1.1.0'
+}
+
+function openAbout(): void {
+  showAbout.value = true
+}
+
+function closeAbout(): void {
+  showAbout.value = false
+}
+
+// Abre o modal "Sobre" quando acionado pelo menu nativo do aplicativo
+if (ipcRenderer) {
+  ipcRenderer.on('open-about', openAbout)
+  onUnmounted(() => {
+    ipcRenderer.removeAllListeners('open-about')
+  })
+}
+
 function validateInput(event: KeyboardEvent): void {
   const input = event.target as HTMLInputElement
   if (event.key === '-' || event.code === 'Minus' || Number(input.value) < 0) {
@@ -400,6 +425,18 @@ async function exportToPDF(): Promise<void> {
       <div class="form-column">
         <div class="form-section">
           <div class="form-row">
+            <label>DIAS ÚTEIS:</label>
+            <input
+              v-model="formData.diasUteis"
+              type="number"
+              :class="['yellow-input', { 'invalid-input': invalidFields.diasUteis }]"
+              style="color: black"
+              min="0"
+              @input="invalidFields.diasUteis = false"
+              @keydown="validateInput"
+            />
+          </div>
+          <div class="form-row">
             <label>TPF:</label>
             <input
               v-model="formData.tpf"
@@ -419,18 +456,6 @@ async function exportToPDF(): Promise<void> {
               class="black-input"
               style="color: white"
               readonly
-            />
-          </div>
-          <div class="form-row">
-            <label>DIAS ÚTEIS:</label>
-            <input
-              v-model="formData.diasUteis"
-              type="number"
-              :class="['yellow-input', { 'invalid-input': invalidFields.diasUteis }]"
-              style="color: black"
-              min="0"
-              @input="invalidFields.diasUteis = false"
-              @keydown="validateInput"
             />
           </div>
           <div class="form-row">
@@ -670,6 +695,31 @@ async function exportToPDF(): Promise<void> {
       <button class="alert-button" @click="closeAlert">OK</button>
     </div>
   </div>
+
+  <div v-if="showAbout" class="about-overlay" @click.self="closeAbout">
+    <div class="about-modal" role="dialog" aria-modal="true" aria-label="Sobre o programa">
+      <div class="about-header">
+        <div class="about-identity">
+          <h3 class="about-app-name">{{ appInfo.nome }}</h3>
+          <span class="about-version">Versão {{ appInfo.versao }}</span>
+        </div>
+        <button class="about-close" aria-label="Fechar" @click="closeAbout">×</button>
+      </div>
+
+      <div class="about-body">
+        <img src="/src/assets/autor.png" alt="Foto do autor" class="about-photo" />
+        <div class="about-author-info">
+          <span class="about-author-label">Desenvolvido por</span>
+          <span class="about-author-name">{{ appInfo.autor }}</span>
+          <span class="about-email">{{ appInfo.email }}</span>
+        </div>
+      </div>
+
+      <div class="about-footer">
+        <button class="about-ok" @click="closeAbout">Fechar</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -901,6 +951,144 @@ h3 {
 }
 
 .alert-button:hover {
+  background-color: #0056b3;
+}
+
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+}
+
+.about-modal {
+  width: min(400px, calc(100vw - 32px));
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  animation: about-in 0.18s ease-out;
+}
+
+@keyframes about-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.about-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #ececec;
+}
+
+.about-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.about-app-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.about-version {
+  font-size: 13px;
+  color: #6c757d;
+}
+
+.about-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 4px;
+  color: #999;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.about-close:hover {
+  color: #333;
+  background-color: #f0f0f0;
+}
+
+.about-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.about-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.about-author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  min-width: 0;
+}
+
+.about-author-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a8a8a;
+}
+
+.about-author-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.about-email {
+  font-size: 13px;
+  color: #555;
+  word-break: break-all;
+}
+
+.about-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #ececec;
+}
+
+.about-ok {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.about-ok:hover {
   background-color: #0056b3;
 }
 </style>

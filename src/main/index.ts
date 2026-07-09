@@ -1,8 +1,31 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 import { join, dirname } from 'path'
 import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+function createMenu(): void {
+  const template: MenuItemConstructorOptions[] = [
+    // No macOS os menus padrão (app/editar) são necessários para atalhos como copiar/colar
+    ...(process.platform === 'darwin'
+      ? ([{ role: 'appMenu' }, { role: 'editMenu' }] as MenuItemConstructorOptions[])
+      : []),
+    {
+      label: 'Sobre',
+      submenu: [
+        {
+          label: 'Sobre o Programa',
+          click: (): void => {
+            const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+            window?.webContents.send('open-about')
+          }
+        }
+      ]
+    }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -10,7 +33,7 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: true,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -142,6 +165,7 @@ app.whenReady().then(() => {
     }
   })
 
+  createMenu()
   createWindow()
 
   app.on('activate', function () {
