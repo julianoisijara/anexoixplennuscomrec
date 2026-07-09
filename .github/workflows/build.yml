@@ -39,13 +39,12 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Usa "npm install" (e não "npm ci") de propósito: o Rollup/esbuild dependem de
-      # binários nativos por plataforma via optionalDependencies, e o npm registra no
-      # package-lock apenas o binário da plataforma onde o lock foi gerado (bug npm#4828).
-      # "npm ci" seguiria o lock à risca e não instalaria o binário do runner Windows/Linux;
-      # "npm install" reconcilia e instala o binário nativo correto para cada plataforma.
+      # Requer um package-lock.json gerado do zero (sem node_modules), que registra os
+      # binários nativos do Rollup/esbuild de TODAS as plataformas com os campos os/cpu.
+      # Um lock gerado com node_modules preexistente só contém os binários do SO local e
+      # faz o build falhar nos runners (bug npm#4828: "Cannot find module @rollup/...").
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
       # Gera os pacotes portáteis. --publish never evita qualquer publicação automática.
       - name: Build (${{ matrix.platform }})
