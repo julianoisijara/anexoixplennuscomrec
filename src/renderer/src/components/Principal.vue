@@ -240,6 +240,11 @@ function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Exibe números usando vírgula como separador decimal (padrão pt-BR)
+function formatDecimal(value: number): string {
+  return String(value).replace('.', ',')
+}
+
 const invalidFields = ref({
   os: false,
   revisorOs: false,
@@ -266,7 +271,7 @@ function closeAlert(): void {
 const showAbout = ref(false)
 const appInfo = {
   nome: 'Anexo IX Plennus (ComRec)',
-  autor: '1T Juliano CCARJ',
+  autor: '1T Juliano CCA-RJ',
   email: 'julianojri@fab.mil.br',
   versao: '1.1.0'
 }
@@ -607,7 +612,7 @@ async function exportToPDF(): Promise<void> {
             <tbody>
               <tr>
                 <td>7.1 – IMS</td>
-                <td>{{ formData.item7 }}</td>
+                <td>{{ formatDecimal(formData.item7) }}</td>
               </tr>
             </tbody>
           </table>

@@ -4,7 +4,7 @@
   "description": "Aplicativo Plennus para calculo anexo ix comissao comrec",
   "main": "./out/main/index.js",
   "homepage": "https://github.com/julianoisijara",
-  "author": "1T Juliano CCARJ",
+  "author": "1T Juliano CCA-RJ",
   "email": "julianojri@fab.mil.br",
   "scripts": {
     "format": "prettier --write .",
