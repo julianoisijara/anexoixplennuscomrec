@@ -1,5 +1,7 @@
 appId: com.electron.app
-productName: Anexo IX Plennus (ComRec)
+# Apenas letras, dígitos, hífens, underscores, pontos e espaços — o electron-builder
+# usa este nome em caminhos de arquivo (AppImage/.desktop) e rejeita parênteses
+productName: Anexo IX Plennus ComRec
 directories:
   buildResources: build
 files:
