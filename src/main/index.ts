@@ -3,7 +3,7 @@ import type { MenuItemConstructorOptions } from 'electron'
 import { join, dirname } from 'path'
 import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../public/fab.png?asset'
 
 function createMenu(): void {
   const template: MenuItemConstructorOptions[] = [
@@ -34,7 +34,8 @@ function createWindow(): void {
     height: 670,
     show: true,
     autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    // Ícone da janela no Linux e Windows (no macOS o ícone vem do bundle .icns)
+    ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -65,6 +66,12 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  // Ícone do dock no macOS durante o desenvolvimento
+  // (no app empacotado o ícone vem do fab.icns via electron-builder)
+  if (is.dev && process.platform === 'darwin') {
+    app.dock?.setIcon(icon)
+  }
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
