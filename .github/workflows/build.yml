@@ -1,10 +1,16 @@
 name: CI Build
 
 on:
-  # Dispara ao criar uma tag de versão (ex.: v1.1.0)
+  # Executa automaticamente a cada push na branch principal e em tags de versão (ex.: v1.1.0)
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+  # Também executa em Pull Requests direcionados à main
+  pull_request:
+    branches:
+      - main
   # Permite disparar manualmente pela aba Actions do GitHub
   workflow_dispatch:
 
